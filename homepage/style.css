@@ -1,0 +1,10 @@
+body { 
+    font-family: Arial, sans-serif; 
+    margin: 20px; 
+    background-color: #f5f5dc; /* Light beige for a restaurant feel; change to #e8f5e8 for green */
+}
+header { text-align: center; }
+.gallery { display: flex; flex-wrap: wrap; }
+.services { margin-top: 20px; }
+.services ul { list-style-type: none; padding: 0; }
+.services li { margin-bottom: 10px; padding: 10px; background-color: #fff; border-radius: 5px; }

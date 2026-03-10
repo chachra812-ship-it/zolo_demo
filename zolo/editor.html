@@ -1,0 +1,125 @@
+<!-- editor.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blog Editor</title>
+    <style>
+        .section-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #f9f9f9; }
+        .remove-btn { background: red; color: white; border: none; padding: 5px; cursor: pointer; float: right; }
+    </style>
+</head>
+<body>
+
+    <h2>Create / Edit Blog</h2>
+    
+    <label>Blog Title:</label><br>
+    <input type="text" id="blogTitle" style="width: 100%; padding: 8px;"><br><br>
+
+    <div id="sectionsContainer"></div>
+
+    <button onclick="addTextSection()">+ Add Text Section</button>
+    <button onclick="addImageSection()">+ Add Image Section</button>
+    <br><br>
+    <button onclick="saveBlog()" style="background: green; color: white; padding: 10px;">Save Blog</button>
+
+    <script>
+        // 1. Load existing blog if it exists
+        fetch('get_blog.php')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('blogTitle').value = data.title;
+                    data.sections.forEach(sec => renderSection(sec.type, sec.content));
+                }
+            });
+
+        // 2. Function to render a section in HTML
+        function renderSection(type, content = '') {
+            const container = document.getElementById('sectionsContainer');
+            const div = document.createElement('div');
+            div.className = 'section-box';
+            
+            let html = `<button class="remove-btn" onclick="this.parentElement.remove()">X</button>`;
+            
+            if (type === 'text') {
+                html += `<textarea rows="4" style="width:100%" onchange="updateContent(this)">${content}</textarea>`;
+            } else if (type === 'image') {
+                if (content) {
+                    // If image URL exists, show it
+                    html += `<img src="${content}" height="100"><br>`;
+                    html += `<input type="hidden" value="${content}">`; // Store URL
+                }
+                html += `<input type="file" onchange="handleImageUpload(this)">`;
+            }
+
+            // Store the type in a data attribute
+            div.dataset.type = type;
+            div.innerHTML = html;
+            container.appendChild(div);
+        }
+
+        // 3. Add new sections
+        function addTextSection() {
+            renderSection('text');
+        }
+
+        function addImageSection() {
+            renderSection('image');
+        }
+
+        // 4. Handle Image Upload (Simple: Convert to Base64)
+        function handleImageUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Replace the input with a hidden input containing the Base64 string
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.value = e.target.result;
+                    
+                    // Show preview
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.height = 100;
+
+                    input.parentElement.appendChild(hiddenInput);
+                    input.parentElement.appendChild(img);
+                    input.style.display = 'none'; // Hide the file input
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // 5. Save to Database
+        function saveBlog() {
+            const title = document.getElementById('blogTitle').value;
+            const sectionDivs = document.querySelectorAll('.section-box');
+            let sections = [];
+
+            sectionDivs.forEach(div => {
+                const type = div.dataset.type;
+                let content = '';
+
+                if (type === 'text') {
+                    content = div.querySelector('textarea').value;
+                } else if (type === 'image') {
+                    const hiddenInput = div.querySelector('input[type="hidden"]');
+                    content = hiddenInput ? hiddenInput.value : '';
+                }
+
+                sections.push({ type: type, content: content });
+            });
+
+            fetch('save_blog.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, sections: sections })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+            });
+        }
+    </script>
+</body>
+</html>
