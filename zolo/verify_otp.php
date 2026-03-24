@@ -12,6 +12,29 @@ if (!isset($_SESSION['pending_registration'])) {
     header("Location: register.php");
     exit;
 }
+// Handle AJAX verification (add this)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'verify_otp') {
+    header('Content-Type: application/json');
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $otp = trim($input['otp'] ?? '');
+    
+    $pending = $_SESSION['pending_registration'];
+    
+    if (time() - $pending['otp_time'] > 300) {
+        unset($_SESSION['pending_registration']);
+        echo json_encode(['status' => 'error', 'message' => 'OTP expired']);
+        exit;
+    }
+    
+    if ($otp !== $pending['otp']) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid OTP']);
+        exit;
+    }
+    
+    echo json_encode(['status' => 'success', 'message' => 'Verified!']);
+    exit;
+}
 ?>
 
 <!DOCTYPE html>

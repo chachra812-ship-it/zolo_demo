@@ -132,7 +132,7 @@ $conn->close();
             </div>
             <div class="top-bar-right">
                 <?php if (isset($_SESSION['user_id'])): ?>
-                    <span>👤 Welcome, <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
+                    <span>👤 Welcome, <?php echo isset($_SESSION['user_name']) ? htmlspecialchars($_SESSION['user_name']) : 'Guest'; ?></span>
                     <a href="dashboard.php" class="login-btn-small">Dashboard</a>
                     <a href="logout.php" class="logout-btn">Logout</a>
                 <?php else: ?>
@@ -161,7 +161,7 @@ $conn->close();
         <div class="services-grid">
             <?php foreach ($services as $service): ?>
                 <div class="service-card">
-                    <div class="icon"><?php echo $service['icon']; ?></div>
+                   <div class="icon"><?php echo isset($service['icon']) ? $service['icon'] : '🚀'; ?></div>
                     <h3><?php echo htmlspecialchars($service['title']); ?></h3>
                     <p><?php echo htmlspecialchars($service['short_description']); ?></p>
                     <div class="price">$<?php echo number_format($service['price'], 2); ?></div>

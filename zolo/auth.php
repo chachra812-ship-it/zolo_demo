@@ -1,13 +1,12 @@
 <?php
-// auth.php - Authentication Handler with OTP Display on Screen
+// auth.php - FIXED VERSION for zolo_db
 session_start();
-
 require_once 'config.php';
 
 header('Content-Type: application/json');
 
 // Check database connection
-if (!$conn) {
+if ($conn->connect_error) {
     echo json_encode(['status' => 'error', 'message' => 'Database connection failed']);
     exit;
 }
@@ -48,23 +47,26 @@ if ($action === 'register') {
         // Hash password
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         
+        // Generate username from email/name
+        $username = strtolower(str_replace([' ', '.', '@'], '_', $email));
+        
         // Generate 6-digit OTP
         $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
         
         // Store OTP in session temporarily
         $_SESSION['pending_registration'] = [
-            'name' => $name,
+            'full_name' => $name,  // FIXED: matches zolo_db column
+            'username' => $username,
             'email' => $email,
             'password' => $hashedPassword,
             'otp' => $otp,
             'otp_time' => time()
         ];
 
-        // Return success with OTP (display on screen)
         echo json_encode([
             'status' => 'otp_sent', 
             'message' => 'OTP generated successfully!',
-            'otp' => $otp, // OTP displayed on screen
+            'otp' => $otp,
             'email' => $email
         ]);
     } else {
@@ -72,7 +74,7 @@ if ($action === 'register') {
     }
 }
 
-// VERIFY OTP ACTION
+// VERIFY OTP ACTION - REDIRECT TO SUCCESS PAGE
 elseif ($action === 'verify_otp') {
     $json_data = file_get_contents('php://input');
     $data = json_decode($json_data, true);
@@ -81,38 +83,36 @@ elseif ($action === 'verify_otp') {
         $enteredOTP = trim($data['otp']);
         $pending = $_SESSION['pending_registration'];
         
-        // Check if OTP expired (10 minutes)
         if (time() - $pending['otp_time'] > 600) {
-            echo json_encode(['status' => 'error', 'message' => 'OTP expired! Please register again.']);
+            echo json_encode(['status' => 'error', 'message' => 'OTP expired!']);
             unset($_SESSION['pending_registration']);
             exit;
         }
         
-        // Verify OTP
         if ($enteredOTP === $pending['otp']) {
-            // Insert user into database
-            $stmt = $conn->prepare("INSERT INTO users (name, email, password, is_verified, verified_at) VALUES (?, ?, ?, 1, NOW())");
-            $stmt->bind_param("sss", $pending['name'], $pending['email'], $pending['password']);
+            // Insert user
+            $stmt = $conn->prepare("INSERT INTO users (username, email, password, full_name, role, status) VALUES (?, ?, ?, ?, 'customer', 'active')");
+            $stmt->bind_param("ssss", $pending['username'], $pending['email'], $pending['password'], $pending['full_name']);
             
             if ($stmt->execute()) {
-                // Clear pending registration
+                $_SESSION['user_email'] = $pending['email']; // For success page
                 unset($_SESSION['pending_registration']);
                 
                 echo json_encode([
                     'status' => 'success', 
-                    'message' => 'Email verified successfully! You can now login.'
+                    'message' => 'Registration successful!',
+                    'redirect' => 'registration-success.php'
                 ]);
             } else {
-                echo json_encode(['status' => 'error', 'message' => 'Registration failed! Please try again.']);
+                echo json_encode(['status' => 'error', 'message' => 'Registration failed: ' . $conn->error]);
             }
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Invalid OTP! Please try again.']);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid OTP']);
         }
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Session expired! Please register again.']);
+        echo json_encode(['status' => 'error', 'message' => 'Session expired']);
     }
 }
-
 // RESEND OTP ACTION
 elseif ($action === 'resend_otp') {
     if (isset($_SESSION['pending_registration'])) {
@@ -125,83 +125,83 @@ elseif ($action === 'resend_otp') {
         
         echo json_encode([
             'status' => 'otp_sent', 
-            'message' => 'New OTP generated!',
-            'otp' => $newOTP // New OTP displayed on screen
+            'message' => '✅ New OTP generated!',
+            'otp' => $newOTP
         ]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Session expired! Please register again.']);
+        echo json_encode(['status' => 'error', 'message' => 'No pending registration!']);
     }
 }
 
-// LOGIN ACTION
-// Replace the LOGIN ACTION section in auth.php with this:
-
-// LOGIN ACTION
+// LOGIN ACTION - FIXED FOR zolo_db
 elseif ($action === 'login') {
     $json_data = file_get_contents('php://input');
     $data = json_decode($json_data, true);
 
     if ($data) {
-        $email = filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL);
+        $email = trim($data['email']);
         $password = $data['password'];
 
-        if (!$email) {
-            echo json_encode(['status' => 'error', 'message' => 'Invalid email format!']);
-            exit;
-        }
+        // DEBUG: Log email being searched
+        error_log("Login attempt for email: " . $email);
 
-        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        // FIXED QUERY - Matches zolo_db EXACTLY
+        $stmt = $conn->prepare("SELECT id, username, email, password, full_name, role, status FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
 
+        error_log("Login query result rows: " . $result->num_rows);
+
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
             
+            error_log("User found: " . print_r($user, true));
+
+            // Check account status
+            if ($user['status'] !== 'active') {
+                echo json_encode(['status' => 'error', 'message' => 'Account is inactive! Contact support.']);
+                exit;
+            }
+
+            // Verify password
             if (password_verify($password, $user['password'])) {
-                
-                // ALWAYS allow login - auto-verify if not verified
-                $isVerified = $user['is_verified'];
-                
-                // Auto-verify unverified users on login for testing
-                if ($isVerified == 0) {
-                    $update = $conn->prepare("UPDATE users SET is_verified = 1, verified_at = NOW() WHERE id = ?");
-                    $update->bind_param("i", $user['id']);
-                    $update->execute();
-                    $isVerified = 1;
-                }
-                
-                // Regenerate session ID for security
+                // SUCCESS LOGIN
                 session_regenerate_id(true);
                 
-                // Set session variables
                 $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['username'] = $user['username'];
                 $_SESSION['user_email'] = $user['email'];
-                $_SESSION['is_verified'] = $isVerified;
+                $_SESSION['full_name'] = $user['full_name'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['is_verified'] = 1;
                 $_SESSION['logged_in'] = true;
                 $_SESSION['login_time'] = time();
-                
-                // Close session properly
-                session_write_close();
-                
-                echo json_encode(['status' => 'success', 'message' => 'Login successful! Redirecting...']);
+
+                echo json_encode([
+                    'status' => 'success', 
+                    'message' => 'Login successful! Welcome back ' . $user['full_name'] . '!',
+                    'user' => [
+                        'id' => $user['id'],
+                        'name' => $user['full_name'],
+                        'email' => $user['email'],
+                        'role' => $user['role']
+                    ]
+                ]);
             } else {
-                echo json_encode(['status' => 'error', 'message' => 'Invalid password!']);
+                echo json_encode(['status' => 'error', 'message' => '❌ Wrong password!']);
             }
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Email not registered!']);
+            echo json_encode(['status' => 'error', 'message' => '❌ Email not found in database!']);
         }
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Invalid data received']);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid login data!']);
     }
 }
-
 // LOGOUT ACTION
 elseif ($action === 'logout') {
-    $_SESSION = array();
     session_destroy();
-    echo json_encode(['status' => 'success', 'message' => 'Logged out successfully']);
+    echo json_encode(['status' => 'success', 'message' => 'Logged out!']);
 }
 
 $conn->close();

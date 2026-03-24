@@ -93,7 +93,7 @@
             
             // Search in Blog Posts
             echo '<h2 style="margin: 30px 0 20px; color: #1a1a2e;">Blog Posts</h2>';
-            $stmt = $conn->prepare("SELECT id, title, excerpt FROM posts WHERE title LIKE ? OR excerpt LIKE ?");
+            $stmt = $conn->prepare("SELECT id, title, excerpt FROM blog_posts WHERE title LIKE ? OR excerpt LIKE ?");
             $stmt->bind_param("ss", $searchTerm, $searchTerm);
             $stmt->execute();
             $posts = $stmt->get_result();

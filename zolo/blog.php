@@ -221,7 +221,7 @@ $conn->close();
             </div>
             <div class="top-bar-right">
                 <?php if (isset($_SESSION['user_id'])): ?>
-                    <span>👤 <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
+                    <span>👤 <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
                     <a href="dashboard.php">Dashboard</a>
                     <a href="blog_manager.php">📝 Blog Manager</a>
                     <a href="logout.php" class="logout-btn">Logout</a>
@@ -269,7 +269,7 @@ $conn->close();
                                 <?php endif; ?>
                                 <h2 class="blog-card-title"><?php echo htmlspecialchars($post['title']); ?></h2>
                                 <div class="blog-card-meta">
-                                    By <?php echo htmlspecialchars($post['author_name']); ?> | 
+                                    By <?php echo htmlspecialchars($post['author_name'] ?? 'Anonymous'); ?> |
                                     <?php echo date('F d, Y', strtotime($post['created_at'])); ?>
                                 </div>
                                 <p class="blog-card-excerpt"><?php echo htmlspecialchars($post['excerpt']); ?></p>

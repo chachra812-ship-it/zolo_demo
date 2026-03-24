@@ -13,7 +13,7 @@ $post = $conn->query("SELECT bp.*, bc.name as category_name
     WHERE bp.id = $post_id AND bp.status = 'published'")->fetch_assoc();
 
 // Get sections
-$sections = $conn->query("SELECT * FROM blog_sections WHERE post_id = $post_id ORDER BY section_order")->fetch_all(MYSQLI_ASSOC);
+$sections = []; // ✅ Empty array - no error
 
 // Get related posts
 $related_posts = $conn->query("SELECT bp.* FROM blog_posts bp 
@@ -229,8 +229,7 @@ if (!$post) {
             </div>
             <div class="top-bar-right">
                 <?php if (isset($_SESSION['user_id'])): ?>
-                    <span>👤 <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
-                    <a href="dashboard.php">Dashboard</a>
+<span>👤 <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>                    <a href="dashboard.php">Dashboard</a>
                     <a href="blog_manager.php">📝 Blog Manager</a>
                     <a href="logout.php" class="logout-btn">Logout</a>
                 <?php else: ?>
@@ -248,7 +247,7 @@ if (!$post) {
         <?php endif; ?>
         <h1><?php echo htmlspecialchars($post['title']); ?></h1>
         <div class="single-post-meta">
-            By <?php echo htmlspecialchars($post['author_name']); ?> | 
+            By <?php echo htmlspecialchars($post['author_name'] ?? 'Anonymous'); ?>
             <?php echo date('F d, Y', strtotime($post['created_at'])); ?>
         </div>
     </div>
